@@ -23,6 +23,9 @@ from torch.utils.data import DataLoader
 
 import cocochorales_custom_dataset
 
+from accelerate.utils import ProjectConfiguration
+
+
 # import boto3
 # import datetime
 # from botocore.errorfactory import ClientError
@@ -96,7 +99,7 @@ cocochorales_audio_frequency = 16000
 
 if args.run_mode == "openslr":
     dataset = None
-    dataset_folder = "/fsx/itsleonwu/audiolm-pytorch-datasets/LibriSpeech-dev-clean/dev-clean"
+    dataset_folder = "/media/checkpoint/audiolm-pytorch-datasets/LibriSpeech-dev-clean/dev-clean"
     num_train_steps = 86401
     save_every = 3600
     batch_size = 96
@@ -105,7 +108,7 @@ if args.run_mode == "openslr":
     data_max_length_seconds = None
 elif args.run_mode == "bare_minimum":
     dataset = None
-    dataset_folder = "/fsx/itsleonwu/audiolm-pytorch-datasets/many_identical_copies_of_cocochorales_single_sample_resampled_24kHz_trimmed_first_second"
+    dataset_folder = "/media/checkpoint/audiolm-pytorch-datasets/many_identical_copies_of_cocochorales_single_sample_resampled_24kHz_trimmed_first_second"
     num_train_steps = 10 # i guess need for avoid off by one error
     save_every = 3
     batch_size = 1
@@ -115,7 +118,7 @@ elif args.run_mode == "bare_minimum":
 elif args.run_mode == "cocochorales_overfit_1_second":
     # resample the given sample to 24kHz to work with encodec and then trim it so we take only the first second of audio, so the transformer actually only sees the same data every single time
     dataset = None
-    dataset_folder = "/fsx/itsleonwu/audiolm-pytorch-datasets/many_identical_copies_of_cocochorales_single_sample_resampled_24kHz_trimmed_first_second"
+    dataset_folder = "/media/checkpoint/audiolm-pytorch-datasets/many_identical_copies_of_cocochorales_single_sample_resampled_24kHz_trimmed_first_second"
     num_train_steps = 501
     save_every = 100
     batch_size = 1
@@ -125,7 +128,7 @@ elif args.run_mode == "cocochorales_overfit_1_second":
 elif args.run_mode == "cocochorales_overfit":
     # try a single un-trimmed data point direct from cocochorales, default at 16kHz
     dataset = None
-    dataset_folder = "/fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_single_sample_unprocessed"
+    dataset_folder = "/media/checkpoint/audiolm-pytorch-datasets/cocochorales_single_sample_unprocessed"
     num_train_steps = 5000
     save_every = 1000
     batch_size = 1
@@ -135,7 +138,7 @@ elif args.run_mode == "cocochorales_overfit":
 elif args.run_mode == "cocochorales_test_custom_dataset":
     # try writing a custom Dataset for concatenating samples to learn accompaniments
     # raise AssertionError("not implemented yet")
-    folder = "/fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_main_dataset_v1"
+    folder = "/media/checkpoint/audiolm-pytorch-datasets/cocochorales_main_dataset_v1"
     max_length_samples = 16000 * 15 # cocochorales is 16kHz, we want 15 seconds
     target_sample_hz = cocochorales_audio_frequency
     silence_length_seconds = 0.1
@@ -157,7 +160,7 @@ elif args.run_mode == "test_long_sample":
     # for i in {1..30}; do ffmpeg -i mix.wav -ss 3 -to 17 -c copy segment$i.wav; done && for i in {1..30}; do printf "file '%s'\n" segment$i.wav >> list.txt; done && ffmpeg -f concat -safe 0 -i list.txt -c copy output.wav && rm segment*.wav list.txt
     # Then in /fsx, copy it so you have enough for batch up to 32
     # for i in {0..32}; do cp output.wav output_copy_$i.wav; done
-    dataset_folder = "/fsx/itsleonwu/audiolm-pytorch-datasets/test_long_sample"
+    dataset_folder = "/media/checkpoint/audiolm-pytorch-datasets/test_long_sample"
     num_train_steps = 100
     save_every = 50
     # TODO: this seems to OOM in multi-gpu training. why?
@@ -172,7 +175,7 @@ else:
 # python audiolm_pytorch_demo_laion.py --semantic=/path/to/semantic --coarse=/path/to/coarse --fine=/path/to/fine
 # Checkpoint flags are optional of course. You need to give a full path, no guarantees if it's not a full path.
 # define all dataset paths, checkpoints, etc
-prefix = "/fsx/itsleonwu/audiolm-pytorch-results"
+prefix = "/media/checkpoint/audiolm-pytorch-results"
 hubert_ckpt = f'hubert/hubert_base_ls960.pt'
 hubert_quantizer = f'hubert/hubert_base_ls960_L9_km500.bin' # listed in row "HuBERT Base (~95M params)", column Quantizer
 
@@ -221,7 +224,7 @@ def save_wav(file_name, audio, sample_rate=24000.0):
   comptype = "NONE"
   compname = "not compressed"
   wav_file.setparams((nchannels, sampwidth, sample_rate, nframes, comptype, compname))
-  # WAV files here are using short, 16 bit, signed integers for the 
+  # WAV files here are using short, 16 bit, signed integers for the
   # sample size.  So we multiply the floating point data we have by 32767, the
   # maximum value for a short integer.  NOTE: It is theortically possible to
   # use the floating point -1.0 to 1.0 data directly in a WAV file but not
@@ -288,7 +291,15 @@ def get_semantic_transformer():
     return semantic_transformer
 
 def get_semantic_trainer(semantic_transformer):
+
+    # use with ProjectConfiguration
+    config = ProjectConfiguration(project_dir=".", logging_dir=f"{prefix}/semantic_results_{semantic_results_folder_suffix}_logs")
+    accelerate_kwargs = {
+        "log_with": "tensorboard",
+        "project_config": config
+    }
     semantic_trainer = SemanticTransformerTrainer(
+        accelerate_kwargs = accelerate_kwargs,
         transformer = semantic_transformer,
         wav2vec = wav2vec,
         dataset = dataset, # dataset and folder generally don't show up together-- only one will be defined per run configuration
@@ -325,7 +336,16 @@ def get_coarse_transformer():
     return coarse_transformer
 
 def get_coarse_trainer(coarse_transformer):
+
+    # use with ProjectConfiguration
+    config = ProjectConfiguration(project_dir=".", logging_dir=f"{prefix}/coarse_results_{coarse_results_folder_suffix}_logs")
+    accelerate_kwargs = {
+        "log_with": "tensorboard",
+        "project_config": config
+    }
+
     coarse_trainer = CoarseTransformerTrainer(
+        accelerate_kwargs = accelerate_kwargs,
         transformer = coarse_transformer,
         codec = codec,
         wav2vec = wav2vec,
@@ -363,7 +383,14 @@ def get_fine_transformer():
     return fine_transformer
 
 def get_fine_trainer(fine_transformer):
+    # use with ProjectConfiguration
+    config = ProjectConfiguration(project_dir=".", logging_dir=f"{prefix}/fine_results_{fine_results_folder_suffix}_logs")
+    accelerate_kwargs = {
+        "log_with": "tensorboard",
+        "project_config": config
+    }
     fine_trainer = FineTransformerTrainer(
+        accelerate_kwargs = accelerate_kwargs,
         transformer = fine_transformer,
         codec = codec,
         dataset = dataset, # dataset and folder generally don't show up together-- only one will be defined per run configuration
@@ -461,20 +488,20 @@ def trace_handler(prof):
     with open(profile_log, "w") as f:
         f.write("cpu_time_total:\n")
         f.write(f"{prof.key_averages(group_by_input_shape=True).table(sort_by='cpu_time_total', row_limit=10)}")
-        f.write("\nself_cpu_time_total:\n") 
+        f.write("\nself_cpu_time_total:\n")
         f.write(f"{prof.key_averages().table(sort_by='self_cpu_time_total', row_limit=10)}")
         f.write("\ncpu_memory_usage:\n")
         f.write(f"{prof.key_averages().table(sort_by='cpu_memory_usage', row_limit=10)}\n")
-        f.write("\nself_cpu_memory_usage:\n") 
+        f.write("\nself_cpu_memory_usage:\n")
         f.write(f"{prof.key_averages().table(sort_by='self_cpu_memory_usage', row_limit=10)}")
 
         f.write("cuda_time_total:\n")
         f.write(f"{prof.key_averages(group_by_input_shape=True).table(sort_by='cuda_time_total', row_limit=10)}")
-        f.write("\nself_cuda_time_total:\n") 
+        f.write("\nself_cuda_time_total:\n")
         f.write(f"{prof.key_averages().table(sort_by='self_cuda_time_total', row_limit=10)}")
         f.write("\ncuda_memory_usage:\n")
         f.write(f"{prof.key_averages().table(sort_by='cuda_memory_usage', row_limit=10)}\n")
-        f.write("\nself_cuda_memory_usage:\n") 
+        f.write("\nself_cuda_memory_usage:\n")
         f.write(f"{prof.key_averages().table(sort_by='self_cuda_memory_usage', row_limit=10)}")
 
     # Also try this:

@@ -276,7 +276,7 @@ def get_dataloader(ds, pad_to_longest = True, **kwargs):
 #         return output
 
 if __name__ == "__main__":
-    dataset = CocochoralesCustomDataset(folder='/fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_main_dataset_v1/1', target_sample_hz=16000, max_length_samples=16000 * 30)
+    dataset = CocochoralesCustomDataset(folder='/media/checkpoint/audiolm-pytorch-datasets/cocochorales_main_dataset_v1/1', target_sample_hz=16000, max_length_samples=16000 * 30)
     dataloader = get_dataloader(dataset, batch_size=1, num_workers=0, shuffle=True)
     for batch in dataloader:
         print(f"len batch is {len(batch)} and first elemtn has shape {batch[0].shape}") # one element of shape 1 x num_samples

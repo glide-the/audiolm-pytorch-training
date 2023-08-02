@@ -6,9 +6,9 @@
 # not the full mix. After doing this trimming we get around 5.5 GB per folder, so we'll download from 1-60 inclusive = 330 GB to be on the safe side.
 # In any case, the audiolm_pytorch code auto-separates code into train/valid/test sets. In reality there are 1-96 for train, and then 1-12 for valid and test each, but we'll just use the first 60 for now.
 
-mkdir /fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_main_dataset_v1 # unzipped
-mkdir /fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_main_dataset_v1_zipped
-cd /fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_main_dataset_v1_zipped
+mkdir /media/checkpoint/audiolm-pytorch-datasets/cocochorales_main_dataset_v1 # unzipped
+mkdir /media/checkpoint/audiolm-pytorch-datasets/cocochorales_main_dataset_v1_zipped
+cd /media/checkpoint/audiolm-pytorch-datasets/cocochorales_main_dataset_v1_zipped
 
 # download md5 if it doesn't exist already
 if [ ! -f "cocochorales_md5s.txt" ]; then
@@ -22,13 +22,13 @@ for i in $(seq 1 1 60); do
     wget https://storage.googleapis.com/magentadata/datasets/cocochorales/cocochorales_full_v1_zipped/main_dataset/train/"$i".tar.bz2
   fi
   # copy to s3, zipped. only run this once!
-  # aws s3 cp /fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_main_dataset_v1_zipped/"$i".tar.bz2 s3://s-laion/itsleonwu-laion/cocochorales_main_dataset_v1_zipped --profile laion-stability-my-s3-bucket
+  # aws s3 cp /media/checkpoint/audiolm-pytorch-datasets/cocochorales_main_dataset_v1_zipped/"$i".tar.bz2 s3://s-laion/itsleonwu-laion/cocochorales_main_dataset_v1_zipped --profile laion-stability-my-s3-bucket
 
   cd ../cocochorales_main_dataset_v1
   mkdir $i
   tar -xjf ../cocochorales_main_dataset_v1_zipped/$i.tar.bz2 -C ./$i
   # copy to s3, unzipped. only run this once!
-  aws s3 cp /fsx/itsleonwu/audiolm-pytorch-datasets/cocochorales_main_dataset_v1/"$i" s3://itsleonwu-laion/cocochorales_main_dataset_v1/$i --recursive --profile laion-stability-my-s3-bucket
+  aws s3 cp /media/checkpoint/audiolm-pytorch-datasets/cocochorales_main_dataset_v1/"$i" s3://itsleonwu-laion/cocochorales_main_dataset_v1/$i --recursive --profile laion-stability-my-s3-bucket
 
   # Cleanup: keep only stem wavs
   cd $i
